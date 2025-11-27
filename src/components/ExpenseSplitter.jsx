@@ -336,10 +336,10 @@ const ExpenseSplitter = () => {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           
           {/* LEFT COLUMN: Configuration & Settlements */}
-          <div className="space-y-6 xl:col-span-1 order-2 xl:order-1">
+          <div className="flex flex-col gap-6 xl:col-span-1 order-1 xl:order-1">
             
             {/* Participants Card */}
-            <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 order-3 xl:order-1">
               <h2 className="text-lg font-semibold flex items-center gap-2 mb-4">
                 <Users className="w-5 h-5 text-indigo-500" />
                 People Involved
@@ -375,7 +375,7 @@ const ExpenseSplitter = () => {
             </div>
 
             {/* SETTLEMENT ENGINE */}
-            <div className="bg-slate-900 text-white p-5 rounded-xl shadow-lg flex flex-col max-h-[500px]">
+            <div className="bg-slate-900 text-white p-5 rounded-xl shadow-lg flex flex-col max-h-[500px] order-1 xl:order-2">
               
               {/* Header with Toggle */}
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 pb-4 border-b border-slate-700 gap-3">
@@ -460,7 +460,7 @@ const ExpenseSplitter = () => {
             </div>
 
              {/* Detailed Balance Sheet */}
-             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 order-2 xl:order-3">
                <h3 className="text-sm font-semibold uppercase text-slate-500 mb-3">Detailed Breakdown</h3>
                <div className="space-y-3">
                  {balances.map((b) => (
@@ -483,7 +483,7 @@ const ExpenseSplitter = () => {
           </div>
 
           {/* RIGHT COLUMN: The Spreadsheet */}
-          <div className="xl:col-span-2 order-1 xl:order-2">
+          <div className="xl:col-span-2 order-4 xl:order-2">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-visible">
               <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                 <h2 className="font-semibold text-slate-700">Expense Log</h2>
