@@ -171,28 +171,21 @@ const ExpenseSplitter = () => {
 
   // --- 2. Generate Share Link ---
   const generateShareLink = () => {
-    // We only share the raw data (Participants + Expenses)
     const payload = {
         p: participants,
         e: expenses
     };
-    // Encode Object -> JSON -> Base64
     const encoded = btoa(JSON.stringify(payload));
-    
-    // Construct URL
     const url = `${window.location.origin}${window.location.pathname}?data=${encoded}`;
     
-    // Robust Copy Logic (Fallback for iframe/restricted environments)
+    // Robust Copy Logic
     const copyToClipboardFallback = (text) => {
         const textArea = document.createElement("textarea");
         textArea.value = text;
-        
-        // Ensure it's not visible but part of DOM
         textArea.style.position = "fixed";
         textArea.style.left = "-9999px";
         textArea.style.top = "0";
         document.body.appendChild(textArea);
-        
         textArea.focus();
         textArea.select();
         
@@ -204,11 +197,9 @@ const ExpenseSplitter = () => {
             console.error('Fallback: Oops, unable to copy', err);
             prompt("Copy this link:", text);
         }
-        
         document.body.removeChild(textArea);
     };
 
-    // Try Navigator API first, fall back to execCommand if it fails or is blocked
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(url)
             .then(() => {
@@ -546,6 +537,12 @@ const ExpenseSplitter = () => {
           </div>
           
         </div>
+
+        {/* Footer */}
+        <div className="text-center text-slate-400 text-sm py-4 border-t border-gray-200 mt-8">
+          Developed by Yash Khandelwal
+        </div>
+
       </div>
     </div>
   );
