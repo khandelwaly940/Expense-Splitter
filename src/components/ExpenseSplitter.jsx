@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Users, Calculator, DollarSign, Check, Download, Share2, Link as LinkIcon, ArrowRightLeft, List } from 'lucide-react';
+import { Plus, Trash2, Users, Calculator, DollarSign, Check, Download, Share2, Link as LinkIcon, ArrowRightLeft, List, ChevronDown, ChevronRight } from 'lucide-react';
 
 const ExpenseSplitter = () => {
   // --- State Management ---
@@ -15,6 +15,7 @@ const ExpenseSplitter = () => {
   const [activeDropdownId, setActiveDropdownId] = useState(null);
   const [showShareToast, setShowShareToast] = useState(false);
   const [settlementMethod, setSettlementMethod] = useState('smart'); // 'smart' or 'itemized'
+  const [expandedGroup, setExpandedGroup] = useState(null); // To track which itemized group is open
 
   // --- 1. Load Data from URL (Sharing Logic) ---
   useEffect(() => {
@@ -99,7 +100,7 @@ const ExpenseSplitter = () => {
         from: debtor.name,
         to: creditor.name,
         amount: amount,
-        reason: 'Settlement' // Generic reason for smart settle
+        reason: 'Settlement' 
       });
 
       debtor.balance += amount;
@@ -112,9 +113,9 @@ const ExpenseSplitter = () => {
     return transactions;
   };
 
-  // --- Method 2: Itemized (Per Transaction) ---
+  // --- Method 2: Itemized (Aggregated by Person Pair) ---
   const calculateItemizedSettlements = () => {
-    const transactions = [];
+    const map = new Map(); // Key: "From-To"
 
     expenses.forEach(expense => {
       const amount = parseFloat(expense.amount) || 0;
@@ -127,17 +128,27 @@ const ExpenseSplitter = () => {
 
       beneficiaries.forEach(person => {
         if (person !== payer) {
-          transactions.push({
-            from: person,
-            to: payer,
-            amount: costPerPerson,
-            reason: expense.item || 'Untitled Item' // Show the item name!
+          const key = `${person}-${payer}`;
+          if (!map.has(key)) {
+            map.set(key, { 
+              from: person, 
+              to: payer, 
+              amount: 0, 
+              items: [],
+              id: key // Unique ID for toggle
+            });
+          }
+          const entry = map.get(key);
+          entry.amount += costPerPerson;
+          entry.items.push({ 
+            reason: expense.item || 'Untitled', 
+            amount: costPerPerson 
           });
         }
       });
     });
 
-    return transactions;
+    return Array.from(map.values());
   };
 
   const settlements = settlementMethod === 'smart' ? calculateSmartSettlements() : calculateItemizedSettlements();
@@ -265,6 +276,10 @@ const ExpenseSplitter = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const toggleGroup = (id) => {
+    setExpandedGroup(expandedGroup === id ? null : id);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans text-slate-800">
@@ -394,22 +409,50 @@ const ExpenseSplitter = () => {
                   </div>
                 ) : (
                     settlements.map((tx, idx) => (
-                      <div key={idx} className="bg-slate-800 p-3 rounded-lg border border-slate-700 flex flex-col gap-1">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 text-sm">
-                            <span className="font-bold text-red-300">{tx.from}</span>
-                            <span className="text-slate-500">→</span>
-                            <span className="font-bold text-green-300">{tx.to}</span>
+                      <div key={idx} className="bg-slate-800 rounded-lg border border-slate-700 flex flex-col overflow-hidden">
+                        
+                        {/* Main Row */}
+                        <div 
+                          className={`p-3 flex items-center justify-between ${settlementMethod === 'itemized' ? 'cursor-pointer hover:bg-slate-700/50 transition-colors' : ''}`}
+                          onClick={() => settlementMethod === 'itemized' && toggleGroup(tx.id)}
+                        >
+                          <div className="flex items-center gap-2">
+                             {settlementMethod === 'itemized' && (
+                               <div className="text-slate-400">
+                                 {expandedGroup === tx.id ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                               </div>
+                             )}
+                             <div className="flex items-center gap-2 text-sm">
+                                <span className="font-bold text-red-300">{tx.from}</span>
+                                <span className="text-slate-500">→</span>
+                                <span className="font-bold text-green-300">{tx.to}</span>
+                              </div>
                           </div>
+                          
                           <div className="font-mono text-lg font-bold text-white">
                             ₹{Math.ceil(tx.amount).toLocaleString('en-IN')}
                           </div>
                         </div>
-                        {/* Show Reason/Item Name in Itemized Mode */}
-                        <div className="text-xs text-slate-500 flex justify-between">
-                           <span className="italic">{tx.reason}</span>
-                           {settlementMethod === 'smart' && <span className="bg-slate-700 px-1.5 rounded text-[10px] text-slate-300">Pooled</span>}
-                        </div>
+
+                        {/* Collapsible Tree (Itemized Mode Only) */}
+                        {settlementMethod === 'itemized' && expandedGroup === tx.id && (
+                          <div className="bg-slate-900/50 border-t border-slate-700 p-2 space-y-1">
+                            {tx.items.map((item, i) => (
+                              <div key={i} className="flex justify-between text-xs px-2 py-1 hover:bg-slate-800 rounded">
+                                <span className="text-slate-300 italic truncate w-2/3">{item.reason}</span>
+                                <span className="text-slate-400 font-mono">₹{Math.ceil(item.amount).toLocaleString('en-IN')}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {/* Smart Mode Tag */}
+                        {settlementMethod === 'smart' && (
+                           <div className="px-3 pb-2 text-xs text-slate-500 flex justify-end">
+                              <span className="bg-slate-700 px-1.5 rounded text-[10px] text-slate-300">Pooled</span>
+                           </div>
+                        )}
+                        
                       </div>
                     ))
                 )}
