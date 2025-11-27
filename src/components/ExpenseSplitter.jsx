@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Users, Calculator, DollarSign, Check, Download, Share2, Link as LinkIcon } from 'lucide-react';
+import { Plus, Trash2, Users, Calculator, DollarSign, Check, Download, Share2, Link as LinkIcon, ArrowRightLeft, List } from 'lucide-react';
 
 const ExpenseSplitter = () => {
   // --- State Management ---
@@ -14,6 +14,7 @@ const ExpenseSplitter = () => {
 
   const [activeDropdownId, setActiveDropdownId] = useState(null);
   const [showShareToast, setShowShareToast] = useState(false);
+  const [settlementMethod, setSettlementMethod] = useState('smart'); // 'smart' or 'itemized'
 
   // --- 1. Load Data from URL (Sharing Logic) ---
   useEffect(() => {
@@ -21,7 +22,6 @@ const ExpenseSplitter = () => {
     const data = params.get('data');
     if (data) {
       try {
-        // Decode Base64 -> JSON string -> Object
         const decoded = JSON.parse(atob(data));
         if (decoded.p && decoded.e) {
             setParticipants(decoded.p);
@@ -46,7 +46,6 @@ const ExpenseSplitter = () => {
     expenses.forEach(expense => {
       const amount = parseFloat(expense.amount) || 0;
       const payer = expense.paidBy;
-      // Filter out deleted users just in case
       const beneficiaries = expense.splitAmong.filter(p => participants.includes(p)); 
       
       const validBeneficiaries = beneficiaries.length > 0 ? beneficiaries : [payer];
@@ -73,7 +72,8 @@ const ExpenseSplitter = () => {
 
   const balances = calculateBalances();
 
-  const calculateSettlements = () => {
+  // --- Method 1: Smart Settle (Pooling / Greedy) ---
+  const calculateSmartSettlements = () => {
     let debtors = balances
       .filter(b => b.balance < -0.01)
       .map(b => ({ ...b, balance: b.balance }));
@@ -98,7 +98,8 @@ const ExpenseSplitter = () => {
       transactions.push({
         from: debtor.name,
         to: creditor.name,
-        amount: amount
+        amount: amount,
+        reason: 'Settlement' // Generic reason for smart settle
       });
 
       debtor.balance += amount;
@@ -111,7 +112,35 @@ const ExpenseSplitter = () => {
     return transactions;
   };
 
-  const settlements = calculateSettlements();
+  // --- Method 2: Itemized (Per Transaction) ---
+  const calculateItemizedSettlements = () => {
+    const transactions = [];
+
+    expenses.forEach(expense => {
+      const amount = parseFloat(expense.amount) || 0;
+      const payer = expense.paidBy;
+      const beneficiaries = expense.splitAmong.filter(p => participants.includes(p));
+      
+      if (beneficiaries.length === 0) return;
+
+      const costPerPerson = amount / beneficiaries.length;
+
+      beneficiaries.forEach(person => {
+        if (person !== payer) {
+          transactions.push({
+            from: person,
+            to: payer,
+            amount: costPerPerson,
+            reason: expense.item || 'Untitled Item' // Show the item name!
+          });
+        }
+      });
+    });
+
+    return transactions;
+  };
+
+  const settlements = settlementMethod === 'smart' ? calculateSmartSettlements() : calculateItemizedSettlements();
 
   // --- Handlers ---
 
@@ -137,7 +166,7 @@ const ExpenseSplitter = () => {
       ...expenses,
       { 
         id: Date.now(), 
-        date: new Date().toISOString().split('T')[0], // Default to today
+        date: new Date().toISOString().split('T')[0], 
         item: '', 
         amount: 0, 
         paidBy: participants[0] || '',
@@ -169,16 +198,11 @@ const ExpenseSplitter = () => {
     setExpenses(expenses.filter(e => e.id !== id));
   };
 
-  // --- 2. Generate Share Link ---
   const generateShareLink = () => {
-    const payload = {
-        p: participants,
-        e: expenses
-    };
+    const payload = { p: participants, e: expenses };
     const encoded = btoa(JSON.stringify(payload));
     const url = `${window.location.origin}${window.location.pathname}?data=${encoded}`;
     
-    // Robust Copy Logic
     const copyToClipboardFallback = (text) => {
         const textArea = document.createElement("textarea");
         textArea.value = text;
@@ -188,7 +212,6 @@ const ExpenseSplitter = () => {
         document.body.appendChild(textArea);
         textArea.focus();
         textArea.select();
-        
         try {
             document.execCommand('copy');
             setShowShareToast(true);
@@ -233,7 +256,6 @@ const ExpenseSplitter = () => {
     document.body.removeChild(link);
   };
 
-  // Click outside listener
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (!event.target.closest('.split-dropdown-container')) {
@@ -247,7 +269,6 @@ const ExpenseSplitter = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans text-slate-800">
       
-      {/* Toast Notification */}
       {showShareToast && (
         <div className="fixed top-5 right-5 bg-slate-800 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 z-50 animate-bounce">
             <LinkIcon className="w-5 h-5 text-green-400" />
@@ -339,32 +360,60 @@ const ExpenseSplitter = () => {
             </div>
 
             {/* SETTLEMENT ENGINE */}
-            <div className="bg-slate-900 text-white p-5 rounded-xl shadow-lg">
-              <h2 className="text-lg font-semibold flex items-center gap-2 mb-4 text-emerald-400">
-                <DollarSign className="w-5 h-5" />
-                Who Pays Whom?
-              </h2>
+            <div className="bg-slate-900 text-white p-5 rounded-xl shadow-lg flex flex-col max-h-[500px]">
               
-              {settlements.length === 0 ? (
-                <div className="text-slate-400 text-center py-4 italic">
-                  {totalSpent === 0 ? "Add expenses to calculate." : "Everyone is settled up!"}
+              {/* Header with Toggle */}
+              <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-700">
+                <h2 className="text-lg font-semibold flex items-center gap-2 text-emerald-400">
+                  <DollarSign className="w-5 h-5" />
+                  Who Pays Whom?
+                </h2>
+                
+                {/* Mode Switcher */}
+                <div className="flex bg-slate-800 rounded-lg p-1 text-xs">
+                  <button 
+                    onClick={() => setSettlementMethod('smart')}
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-md transition-all ${settlementMethod === 'smart' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    <ArrowRightLeft className="w-3 h-3" /> Smart
+                  </button>
+                  <button 
+                    onClick={() => setSettlementMethod('itemized')}
+                    className={`flex items-center gap-1 px-3 py-1.5 rounded-md transition-all ${settlementMethod === 'itemized' ? 'bg-blue-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    <List className="w-3 h-3" /> Itemized
+                  </button>
                 </div>
-              ) : (
-                <div className="space-y-3">
-                  {settlements.map((tx, idx) => (
-                    <div key={idx} className="flex items-center justify-between bg-slate-800 p-3 rounded-lg border border-slate-700">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-red-300">{tx.from}</span>
-                        <span className="text-slate-400 text-sm">pays</span>
-                        <span className="font-bold text-green-300">{tx.to}</span>
+              </div>
+              
+              {/* Results List */}
+              <div className="overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+                {settlements.length === 0 ? (
+                  <div className="text-slate-400 text-center py-4 italic">
+                    {totalSpent === 0 ? "Add expenses to calculate." : "Everyone is settled up!"}
+                  </div>
+                ) : (
+                    settlements.map((tx, idx) => (
+                      <div key={idx} className="bg-slate-800 p-3 rounded-lg border border-slate-700 flex flex-col gap-1">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="font-bold text-red-300">{tx.from}</span>
+                            <span className="text-slate-500">→</span>
+                            <span className="font-bold text-green-300">{tx.to}</span>
+                          </div>
+                          <div className="font-mono text-lg font-bold text-white">
+                            ₹{Math.ceil(tx.amount).toLocaleString('en-IN')}
+                          </div>
+                        </div>
+                        {/* Show Reason/Item Name in Itemized Mode */}
+                        <div className="text-xs text-slate-500 flex justify-between">
+                           <span className="italic">{tx.reason}</span>
+                           {settlementMethod === 'smart' && <span className="bg-slate-700 px-1.5 rounded text-[10px] text-slate-300">Pooled</span>}
+                        </div>
                       </div>
-                      <div className="font-mono text-xl font-bold text-white">
-                        ₹{Math.ceil(tx.amount).toLocaleString('en-IN')}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    ))
+                )}
+              </div>
             </div>
 
              {/* Detailed Balance Sheet */}
