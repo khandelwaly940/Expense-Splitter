@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Users, Calculator, DollarSign, Check, Download, Share2, Link as LinkIcon, ArrowRightLeft, List, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Trash2, Users, Calculator, DollarSign, Check, Download, Share2, Link as LinkIcon, ArrowRightLeft, List, ChevronDown, ChevronRight, Calendar, User } from 'lucide-react';
 
 const ExpenseSplitter = () => {
   // --- State Management ---
@@ -282,7 +282,7 @@ const ExpenseSplitter = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans text-slate-800">
+    <div className="min-h-screen bg-gray-50 p-3 md:p-8 font-sans text-slate-800">
       
       {showShareToast && (
         <div className="fixed top-5 right-5 bg-slate-800 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 z-50 animate-bounce">
@@ -299,35 +299,35 @@ const ExpenseSplitter = () => {
         {/* Header */}
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white p-6 rounded-xl shadow-sm border border-gray-200 gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
+            <h1 className="text-xl md:text-2xl font-bold text-slate-900 flex items-center gap-2">
               <Calculator className="w-6 h-6 text-blue-600" />
               Smart Expense Splitter
             </h1>
-            <p className="text-slate-500 mt-1">Split bills easily with friends.</p>
+            <p className="text-slate-500 mt-1 text-sm md:text-base">Split bills easily with friends.</p>
           </div>
           <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 w-full lg:w-auto">
              <div className="text-right mr-2">
                 <div className="text-xs text-slate-500 uppercase tracking-wide font-semibold">Total Trip Cost</div>
-                <div className="text-3xl font-bold text-blue-600">₹{totalSpent.toLocaleString('en-IN')}</div>
+                <div className="text-2xl md:text-3xl font-bold text-blue-600">₹{totalSpent.toLocaleString('en-IN')}</div>
              </div>
              
              <div className="flex gap-2 w-full sm:w-auto">
                 <button 
                   onClick={generateShareLink}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm"
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors shadow-sm text-sm"
                   title="Copy Link to Clipboard"
                 >
                   <Share2 className="w-4 h-4" />
-                  <span>Share Bill</span>
+                  <span>Share</span>
                 </button>
                 
                 <button 
                   onClick={exportToCSV}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white border border-gray-300 text-slate-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-2 bg-white border border-gray-300 text-slate-700 px-4 py-2 rounded-lg hover:bg-gray-50 transition-colors shadow-sm text-sm"
                   title="Download as CSV"
                 >
                   <Download className="w-4 h-4" />
-                  <span className="hidden sm:inline">Export CSV</span>
+                  <span className="hidden sm:inline">Export</span>
                 </button>
              </div>
           </div>
@@ -336,7 +336,7 @@ const ExpenseSplitter = () => {
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
           
           {/* LEFT COLUMN: Configuration & Settlements */}
-          <div className="space-y-6 xl:col-span-1">
+          <div className="space-y-6 xl:col-span-1 order-2 xl:order-1">
             
             {/* Participants Card */}
             <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
@@ -351,7 +351,7 @@ const ExpenseSplitter = () => {
                   value={newParticipant}
                   onChange={(e) => setNewParticipant(e.target.value)}
                   placeholder="Add Name..." 
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   onKeyDown={(e) => e.key === 'Enter' && addParticipant()}
                 />
                 <button 
@@ -378,14 +378,14 @@ const ExpenseSplitter = () => {
             <div className="bg-slate-900 text-white p-5 rounded-xl shadow-lg flex flex-col max-h-[500px]">
               
               {/* Header with Toggle */}
-              <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-700">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 pb-4 border-b border-slate-700 gap-3">
                 <h2 className="text-lg font-semibold flex items-center gap-2 text-emerald-400">
                   <DollarSign className="w-5 h-5" />
                   Who Pays Whom?
                 </h2>
                 
                 {/* Mode Switcher */}
-                <div className="flex bg-slate-800 rounded-lg p-1 text-xs">
+                <div className="flex bg-slate-800 rounded-lg p-1 text-xs self-start sm:self-auto">
                   <button 
                     onClick={() => setSettlementMethod('smart')}
                     className={`flex items-center gap-1 px-3 py-1.5 rounded-md transition-all ${settlementMethod === 'smart' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-white'}`}
@@ -422,14 +422,14 @@ const ExpenseSplitter = () => {
                                  {expandedGroup === tx.id ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                                </div>
                              )}
-                             <div className="flex items-center gap-2 text-sm">
+                             <div className="flex flex-wrap items-center gap-x-2 text-sm">
                                 <span className="font-bold text-red-300">{tx.from}</span>
                                 <span className="text-slate-500">→</span>
                                 <span className="font-bold text-green-300">{tx.to}</span>
                               </div>
                           </div>
                           
-                          <div className="font-mono text-lg font-bold text-white">
+                          <div className="font-mono text-lg font-bold text-white pl-2">
                             ₹{Math.ceil(tx.amount).toLocaleString('en-IN')}
                           </div>
                         </div>
@@ -483,7 +483,7 @@ const ExpenseSplitter = () => {
           </div>
 
           {/* RIGHT COLUMN: The Spreadsheet */}
-          <div className="xl:col-span-2">
+          <div className="xl:col-span-2 order-1 xl:order-2">
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-visible">
               <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                 <h2 className="font-semibold text-slate-700">Expense Log</h2>
@@ -491,11 +491,128 @@ const ExpenseSplitter = () => {
                   onClick={addExpenseRow}
                   className="text-sm bg-white border border-gray-300 hover:bg-gray-50 text-slate-700 px-3 py-1.5 rounded shadow-sm flex items-center gap-1"
                 >
-                  <Plus className="w-4 h-4" /> Add Row
+                  <Plus className="w-4 h-4" /> <span className="hidden sm:inline">Add Row</span><span className="sm:hidden">Add</span>
                 </button>
               </div>
               
-              <div className="overflow-visible">
+              {/* Mobile View: Cards */}
+              <div className="md:hidden">
+                 {expenses.map((expense) => (
+                    <div key={expense.id} className="p-4 border-b border-gray-100 relative">
+                        <div className="flex justify-between items-start mb-2">
+                           <div className="flex items-center gap-2 text-slate-500 text-sm">
+                              <Calendar className="w-3 h-3" />
+                              <input 
+                                type="date"
+                                className="bg-transparent border-b border-transparent focus:border-blue-400 outline-none p-0 w-24"
+                                value={expense.date}
+                                onChange={(e) => updateExpense(expense.id, 'date', e.target.value)}
+                              />
+                           </div>
+                           <button 
+                              onClick={() => removeExpense(expense.id)}
+                              className="text-slate-300 hover:text-red-500 p-1 -mr-2"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                        </div>
+                        
+                        <div className="flex gap-3 mb-3">
+                           <div className="flex-1">
+                              <input 
+                                type="text" 
+                                className="w-full text-base font-medium placeholder-slate-300 border-b border-transparent focus:border-blue-400 outline-none py-1"
+                                placeholder="What is this for?"
+                                value={expense.item}
+                                onChange={(e) => updateExpense(expense.id, 'item', e.target.value)}
+                              />
+                           </div>
+                           <div className="w-24 relative">
+                              <span className="absolute left-0 top-1.5 text-slate-400 text-sm">₹</span>
+                              <input 
+                                type="number" 
+                                min="0"
+                                className="w-full pl-3 text-base font-bold text-slate-800 border-b border-transparent focus:border-blue-400 outline-none py-1"
+                                value={expense.amount === 0 ? '' : expense.amount}
+                                onChange={(e) => updateExpense(expense.id, 'amount', e.target.value)}
+                                placeholder="0"
+                              />
+                           </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-sm">
+                           <div className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded border border-gray-200">
+                              <User className="w-3 h-3 text-slate-400" />
+                              <select 
+                                className="bg-transparent outline-none text-slate-700 max-w-[80px]"
+                                value={expense.paidBy}
+                                onChange={(e) => updateExpense(expense.id, 'paidBy', e.target.value)}
+                              >
+                                {participants.map(p => (
+                                  <option key={p} value={p}>{p}</option>
+                                ))}
+                              </select>
+                           </div>
+                           <span className="text-slate-400 text-xs">split with</span>
+                           
+                           {/* Mobile Split Dropdown */}
+                           <div className="relative flex-1 split-dropdown-container">
+                              <button
+                                onClick={() => setActiveDropdownId(activeDropdownId === expense.id ? null : expense.id)}
+                                className="w-full text-left bg-gray-50 border border-gray-200 px-2 py-1 rounded text-slate-700 flex justify-between items-center"
+                              >
+                                <span className="truncate max-w-[100px]">
+                                  {expense.splitAmong.length === participants.length 
+                                    ? 'Everyone' 
+                                    : expense.splitAmong.length === 0 
+                                      ? 'No one' 
+                                      : `${expense.splitAmong.length} people`}
+                                </span>
+                                <ChevronDown className="w-3 h-3 text-slate-400" />
+                              </button>
+                              
+                              {/* Dropdown Menu (Mobile Position) */}
+                              {activeDropdownId === expense.id && (
+                                <div className="absolute top-9 left-0 z-50 w-48 bg-white rounded-lg shadow-xl border border-gray-200 p-2">
+                                  <div className="text-xs font-semibold text-slate-400 px-2 py-1 mb-1">Split cost among:</div>
+                                  {participants.map(p => {
+                                    const isChecked = expense.splitAmong.includes(p);
+                                    return (
+                                      <div 
+                                        key={p} 
+                                        className="flex items-center gap-2 px-2 py-2 hover:bg-gray-50 rounded cursor-pointer"
+                                        onClick={() => toggleSplitParticipant(expense.id, p)}
+                                      >
+                                        <div className={`w-4 h-4 rounded border flex items-center justify-center ${isChecked ? 'bg-blue-500 border-blue-500' : 'border-gray-300'}`}>
+                                          {isChecked && <Check className="w-3 h-3 text-white" />}
+                                        </div>
+                                        <span className="text-sm text-slate-700">{p}</span>
+                                      </div>
+                                    );
+                                  })}
+                                  <div className="mt-2 pt-2 border-t border-gray-100 text-center">
+                                    <button 
+                                      className="text-xs text-blue-600 font-medium hover:underline p-2"
+                                      onClick={() => setActiveDropdownId(null)}
+                                    >
+                                      Done
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                           </div>
+                        </div>
+                    </div>
+                 ))}
+                 {expenses.length === 0 && (
+                   <div className="p-8 text-center text-slate-400 text-sm">
+                     No expenses yet. Tap "Add" to start.
+                   </div>
+                 )}
+              </div>
+
+              {/* Desktop View: Table */}
+              <div className="hidden md:block overflow-visible">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-gray-50 text-xs uppercase text-slate-500 tracking-wider">
