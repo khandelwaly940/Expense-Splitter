@@ -1,0 +1,43 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write  # needed by gh-pages to push to gh-pages branch
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: expense/package-lock.json
+
+      - name: Install dependencies
+        working-directory: expense
+        run: npm ci
+
+      - name: Build
+        working-directory: expense
+        env:
+          # VITE_SHORTLINK_PROXY_URL is the only runtime var needed.
+          # It's a public CF Worker URL — not a secret — but stored as a
+          # GitHub secret so it's easy to change without a code push.
+          VITE_SHORTLINK_PROXY_URL: ${{ secrets.VITE_SHORTLINK_PROXY_URL }}
+        run: npm run build
+
+      - name: Deploy to GitHub Pages
+        working-directory: expense
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx gh-pages -d dist -t true

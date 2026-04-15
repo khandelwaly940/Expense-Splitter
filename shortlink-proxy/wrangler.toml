@@ -1,0 +1,14 @@
+name = "expense-shortlink-proxy"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# Service binding — allows this Worker to call the OpenShortURL Worker
+# internally without going through the public internet (fixes error 1042).
+[[services]]
+binding = "OPENSHORT_WORKER"
+service = "openshortlink"
+
+# Secrets (set via `wrangler secret put`, never put here):
+# - OPENSHORT_API_KEY
+# - OPENSHORT_DOMAIN_ID
+# - ALLOWED_ORIGINS
