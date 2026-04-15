@@ -10,7 +10,7 @@ A fast, beautiful, privacy-first expense splitting app. No accounts, no servers,
 
 - ✅ **Split expenses** across any number of people with per-expense split control
 - 🔗 **Share via URL** — full state compressed into a `?d=` query param (lz-string)
-- ✂️ **Short links** — powered by [OpenShortURL](https://openshortlink.khandelwaly940.workers.dev) (self-hosted on Cloudflare Workers + D1)
+- ✂️ **Short links** — powered by [OpenShortURL](https://github.com/idhamsy/openshortlink) (self-hosted on Cloudflare Workers + D1)
 - 💾 **Persistent** — auto-saves to `localStorage`, survives page refresh
 - 📊 **Balance sheet** with per-person bar charts (paid vs. owed)
 - 🧾 **Settlement engine** — Smart (fewest transactions) or Itemized modes
@@ -67,18 +67,6 @@ Short-link generation works in local dev because the proxy URL is hardcoded
 # .env
 VITE_SHORTLINK_PROXY_URL=https://your-proxy.workers.dev
 ```
-
----
-
-## Deploy to GitHub Pages
-
-Push to `main` → GitHub Actions builds and deploys automatically.
-
-**One-time setup:**
-1. Enable GitHub Pages → Source: `gh-pages` branch
-2. No secrets needed — the proxy URL is hardcoded in the source
-
-See [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml).
 
 ---
 
