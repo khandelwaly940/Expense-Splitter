@@ -41,7 +41,8 @@ https://yashkhandelwal.me,https://khandelwaly940.github.io,http://localhost:5173
 |--------|----------|---------|-------------|
 | `OPENSHORT_API_KEY` | ✅ | — | Bearer token for OpenShortURL API |
 | `OPENSHORT_DOMAIN_ID` | ✅ | — | Domain ID to create links under |
-| `ALLOWED_ORIGINS` | ✅ | — | Comma-separated allowed origins |
+| `ALLOWED_ORIGINS` | ✅ | — | Comma-separated allowed request origins |
+| `ALLOWED_DESTINATIONS` | ❌ | hardcoded in worker.js | Comma-separated destination domain prefixes; short links may only point to these |
 | `RATE_LIMIT_PER_HOUR` | ❌ | `10` | Max short links per IP per hour |
 
 ## Local development

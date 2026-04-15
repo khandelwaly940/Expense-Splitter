@@ -112,6 +112,34 @@ export default {
       return corsResponse(JSON.stringify({ error: 'destination_url is required' }), 400, origin);
     }
 
+    // ── Destination URL allowlist ────────────────────────────────────────
+    // Even if someone spoofs the Origin header and calls this proxy directly,
+    // they can only create short links that point back to our own domains.
+    // Redirecting to external/malicious URLs is therefore impossible.
+    const ALLOWED_DESTINATIONS = (env.ALLOWED_DESTINATIONS || '')
+      .split(',')
+      .map(d => d.trim())
+      .filter(Boolean);
+
+    // Fallback hardcoded list — used when env var is not set (e.g. local dev without .dev.vars)
+    const DEFAULT_DESTINATIONS = [
+      'https://yashkhandelwal.me',
+      'https://khandelwaly940.github.io',
+      'http://localhost:5173',
+      'http://localhost:5174',
+    ];
+
+    const destinationAllowlist = ALLOWED_DESTINATIONS.length > 0 ? ALLOWED_DESTINATIONS : DEFAULT_DESTINATIONS;
+
+    const isDestinationAllowed = destinationAllowlist.some(d => destination_url.startsWith(d));
+    if (!isDestinationAllowed) {
+      return corsResponse(
+        JSON.stringify({ error: 'Forbidden destination: short links may only point to allowed domains.' }),
+        403,
+        origin
+      );
+    }
+
     // ── Build request payload ────────────────────────────────────────────
     const payload = { domain_id: env.OPENSHORT_DOMAIN_ID, destination_url };
     if (title) payload.title = String(title).slice(0, 255);
