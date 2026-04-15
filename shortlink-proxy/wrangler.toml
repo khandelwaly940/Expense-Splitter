@@ -12,3 +12,6 @@ service = "openshortlink"
 # - OPENSHORT_API_KEY
 # - OPENSHORT_DOMAIN_ID
 # - ALLOWED_ORIGINS
+# - ALLOWED_DESTINATIONS  (optional — comma-separated destination domain prefixes)
+#     e.g. "https://yashkhandelwal.me,https://khandelwaly940.github.io,http://localhost:5173,http://localhost:5174"
+#     Falls back to hardcoded defaults in worker.js if not set.
