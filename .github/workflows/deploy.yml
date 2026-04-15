@@ -21,23 +21,20 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
-          cache-dependency-path: expense/package-lock.json
+          # package-lock.json is at the repo root (this repo IS the Expense app)
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: expense
         run: npm ci
 
       - name: Build
-        working-directory: expense
         env:
-          # VITE_SHORTLINK_PROXY_URL is the only runtime var needed.
-          # It's a public CF Worker URL — not a secret — but stored as a
-          # GitHub secret so it's easy to change without a code push.
+          # Proxy URL is hardcoded in source — this secret is optional.
+          # Set it in GitHub Secrets only if you want to override the default.
           VITE_SHORTLINK_PROXY_URL: ${{ secrets.VITE_SHORTLINK_PROXY_URL }}
         run: npm run build
 
       - name: Deploy to GitHub Pages
-        working-directory: expense
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx gh-pages -d dist -t true
