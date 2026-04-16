@@ -175,7 +175,9 @@ const ExpenseSplitter = () => {
         splitAmong: [...participants],
         paymentMethod: null,
         includeOwnShare: false,
-        noteAmount: null,          // persisted editable note amount in RepayPanel
+        noteAmount: null,            // override ₹ amount in note sentence
+        repayAmountOverride: null,   // override computed repay amount per expense
+        noteText: null,              // override full note sentence text
       },
     ]);
   };
@@ -225,6 +227,18 @@ const ExpenseSplitter = () => {
   const updateNoteAmount = (expenseId, value) => {
     setExpenses(prev =>
       prev.map(e => e.id === expenseId ? { ...e, noteAmount: value } : e)
+    );
+  };
+
+  const updateRepayAmount = (expenseId, value) => {
+    setExpenses(prev =>
+      prev.map(e => e.id === expenseId ? { ...e, repayAmountOverride: value } : e)
+    );
+  };
+
+  const updateNoteText = (expenseId, value) => {
+    setExpenses(prev =>
+      prev.map(e => e.id === expenseId ? { ...e, noteText: value } : e)
     );
   };
 
@@ -325,6 +339,8 @@ const ExpenseSplitter = () => {
                 expenses={expenses}
                 onToggleOwnShare={toggleOwnShare}
                 onUpdateNoteAmount={updateNoteAmount}
+                onUpdateRepayAmount={updateRepayAmount}
+                onUpdateNoteText={updateNoteText}
               />
             )}
           </div>
