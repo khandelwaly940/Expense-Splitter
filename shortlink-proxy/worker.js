@@ -188,12 +188,16 @@ export default {
 
     // ── Extract short URL from response ──────────────────────────────────
     const link = apiJson.data;
-    const domainName = link.domain_name || 'openshortlink.khandelwaly940.workers.dev';
+    // Priority: API response domain_name → OPENSHORT_DOMAIN_HOST secret → legacy fallback
+    const domainName =
+      link.domain_name ||
+      env.OPENSHORT_DOMAIN_HOST ||
+      'openshortlink.khandelwaly940.workers.dev';
 
-    let route = '/go';
+    let route = '';
     try {
       const meta = typeof link.metadata === 'string' ? JSON.parse(link.metadata) : link.metadata;
-      route = (meta?.route || '/go/*').replace('/*', '');
+      if (meta?.route) route = meta.route.replace('/*', '');
     } catch {}
 
     const shortUrl = `https://${domainName}${route}/${link.slug}`;
