@@ -173,8 +173,9 @@ const ExpenseSplitter = () => {
         amount: 0,
         paidBy: participants[0] || '',
         splitAmong: [...participants],
-        paymentMethod: null,         // NEW — no payment method by default
-        includeOwnShare: false,      // NEW — own share toggle default
+        paymentMethod: null,
+        includeOwnShare: false,
+        noteAmount: null,          // persisted editable note amount in RepayPanel
       },
     ]);
   };
@@ -218,6 +219,12 @@ const ExpenseSplitter = () => {
       prev.map(e =>
         e.id === expenseId ? { ...e, includeOwnShare: !(e.includeOwnShare || false) } : e
       )
+    );
+  };
+
+  const updateNoteAmount = (expenseId, value) => {
+    setExpenses(prev =>
+      prev.map(e => e.id === expenseId ? { ...e, noteAmount: value } : e)
     );
   };
 
@@ -317,6 +324,7 @@ const ExpenseSplitter = () => {
               <RepayPanel
                 expenses={expenses}
                 onToggleOwnShare={toggleOwnShare}
+                onUpdateNoteAmount={updateNoteAmount}
               />
             )}
           </div>

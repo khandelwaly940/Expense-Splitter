@@ -1,5 +1,5 @@
 import React from 'react';
-import { CreditCard, RefreshCw, ToggleLeft, ToggleRight } from 'lucide-react';
+import { CreditCard, RefreshCw, ToggleLeft, ToggleRight, RotateCcw } from 'lucide-react';
 
 /**
  * Repay panel — light themed, consistent with the rest of the app.
@@ -7,14 +7,15 @@ import { CreditCard, RefreshCw, ToggleLeft, ToggleRight } from 'lucide-react';
  * Shows contextual accounting notes per expense:
  *  - includeOwnShare ON  → "Log your expense of ₹[X] into your expense logs"
  *  - includeOwnShare OFF → "Log your expense of ₹[X] into [PaymentMethod]"
+ *
+ * The note amount is stored on expense.noteAmount (persisted + shared via URL).
+ *
+ * Props:
+ *  expenses           — full expense list
+ *  onToggleOwnShare   — (expenseId) => void
+ *  onUpdateNoteAmount — (expenseId, value) => void
  */
-const RepayPanel = ({ expenses, onToggleOwnShare }) => {
-  const [noteAmounts, setNoteAmounts] = React.useState({});
-
-  const handleNoteAmountChange = (expenseId, value) => {
-    setNoteAmounts(prev => ({ ...prev, [expenseId]: value }));
-  };
-
+const RepayPanel = ({ expenses, onToggleOwnShare, onUpdateNoteAmount }) => {
   const tagged = expenses.filter(e => e.paymentMethod && parseFloat(e.amount) > 0);
   if (tagged.length === 0) return null;
 
@@ -84,10 +85,10 @@ const RepayPanel = ({ expenses, onToggleOwnShare }) => {
                   const includeOwn = expense.includeOwnShare || false;
                   const lineTotal = othersShare + (includeOwn ? ownShare : 0);
 
+                  // noteAmount: use expense.noteAmount if set, otherwise default to ceiled ownShare
                   const defaultNoteAmt = Math.ceil(ownShare);
-                  const noteAmtVal = noteAmounts[expense.id];
-                  const noteAmtDisplay = noteAmtVal !== undefined
-                    ? noteAmtVal
+                  const noteAmtDisplay = expense.noteAmount != null
+                    ? expense.noteAmount
                     : (defaultNoteAmt > 0 ? String(defaultNoteAmt) : '');
 
                   const showNote = ownShare > 0;
@@ -141,20 +142,32 @@ const RepayPanel = ({ expenses, onToggleOwnShare }) => {
                         }`}>
                           <span className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5">
                             <span>📒 Log your expense of</span>
-                            <span className="inline-flex items-baseline gap-px">
+                            <span className="inline-flex items-center gap-0.5">
                               <span className={`text-[10px] ${includeOwn ? 'text-emerald-500' : 'text-amber-500'}`}>₹</span>
                               <input
                                 type="number"
                                 min="0"
                                 value={noteAmtDisplay}
                                 placeholder={String(defaultNoteAmt)}
-                                onChange={e => handleNoteAmountChange(expense.id, e.target.value)}
+                                onChange={e => onUpdateNoteAmount(expense.id, e.target.value)}
                                 className={`w-16 bg-transparent outline-none text-[11px] font-mono text-right px-0.5 border-b ${
                                   includeOwn
                                     ? 'border-emerald-300 text-emerald-800'
                                     : 'border-amber-300 text-amber-800'
                                 }`}
                               />
+                              {expense.noteAmount != null && (
+                                <button
+                                  type="button"
+                                  title="Reset to default (own share)"
+                                  onClick={() => onUpdateNoteAmount(expense.id, null)}
+                                  className={`ml-0.5 opacity-50 hover:opacity-100 transition-opacity ${
+                                    includeOwn ? 'text-emerald-600' : 'text-amber-600'
+                                  }`}
+                                >
+                                  <RotateCcw className="w-2.5 h-2.5" />
+                                </button>
+                              )}
                             </span>
                             {includeOwn ? (
                               <span>into your expense logs</span>
