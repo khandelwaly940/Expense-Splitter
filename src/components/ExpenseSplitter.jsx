@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // Components
 import Header from './Header';
@@ -8,6 +8,7 @@ import BalanceSheet from './BalanceSheet';
 import ExpenseTable from './ExpenseTable';
 import ExpenseCard from './ExpenseCard';
 import ShareModal from './ShareModal';
+import RepayPanel from './RepayPanel';
 
 // Utils & Hooks
 import { calculateBalances, calculateSmartSettlements, calculateItemizedSettlements } from '../utils/calculations';
@@ -18,12 +19,11 @@ import { usePersistedState, loadPersistedState, clearPersistedState } from '../h
 // ─── Default seed data ────────────────────────────────────────────────────────
 const TODAY = new Date().toISOString().split('T')[0];
 
-const DEFAULT_PARTICIPANTS = ['Alice', 'Bob', 'Charlie'];
-const DEFAULT_EXPENSES = [
-  { id: 1, date: TODAY, item: 'Dinner', amount: 1800, paidBy: 'Alice', splitAmong: ['Alice', 'Bob', 'Charlie'] },
-  { id: 2, date: TODAY, item: 'Drinks', amount: 600, paidBy: 'Bob', splitAmong: ['Alice', 'Bob', 'Charlie'] },
-];
+const DEFAULT_PARTICIPANTS = [];
+const DEFAULT_EXPENSES = [];
 const DEFAULT_TRIP_NAME = '';
+
+const DEFAULT_PAYMENT_METHODS = [];
 
 // ─── Initialise state (URL > localStorage > defaults) ────────────────────────
 function getInitialState() {
@@ -33,6 +33,7 @@ function getInitialState() {
       participants: fromURL.p,
       expenses: fromURL.e,
       tripName: fromURL.t || DEFAULT_TRIP_NAME,
+      paymentMethods: fromURL.pm || DEFAULT_PAYMENT_METHODS,
       fromURL: true,
     };
   }
@@ -43,6 +44,7 @@ function getInitialState() {
       participants: persisted.participants,
       expenses: persisted.expenses,
       tripName: persisted.tripName || DEFAULT_TRIP_NAME,
+      paymentMethods: persisted.paymentMethods || DEFAULT_PAYMENT_METHODS,
       fromURL: false,
     };
   }
@@ -51,6 +53,7 @@ function getInitialState() {
     participants: DEFAULT_PARTICIPANTS,
     expenses: DEFAULT_EXPENSES,
     tripName: DEFAULT_TRIP_NAME,
+    paymentMethods: DEFAULT_PAYMENT_METHODS,
     fromURL: false,
   };
 }
@@ -58,30 +61,47 @@ function getInitialState() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const ExpenseSplitter = () => {
-  const initial = getInitialState();
+  // Memoize initial state — getInitialState() must only run ONCE (it reads
+  // localStorage + URL params; re-running it on every render is both wasteful
+  // and a source of stale-read bugs during reset).
+  const initialRef = React.useRef(null);
+  if (!initialRef.current) initialRef.current = getInitialState();
+  const initial = initialRef.current;
 
   const [participants, setParticipants] = useState(initial.participants);
   const [expenses, setExpenses] = useState(initial.expenses);
   const [tripName, setTripName] = useState(initial.tripName);
+  const [paymentMethods, setPaymentMethods] = useState(initial.paymentMethods);
   const [newParticipant, setNewParticipant] = useState('');
 
   const [activeDropdownId, setActiveDropdownId] = useState(null);
   const [settlementMethod, setSettlementMethod] = useState('smart');
   const [expandedGroup, setExpandedGroup] = useState(null);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [showRepay, setShowRepay] = useState(true);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
-  // Persist to localStorage (debounced). Skip on first render if loaded from URL.
-  const persistEnabled = !initial.fromURL;
-  usePersistedState({ participants, expenses, tripName }, persistEnabled);
+  // ── URL-share → localStorage handoff ─────────────────────────────────────
+  //
+  // When the app is opened via a share link the URL param (?d=...) takes
+  // priority over localStorage in getInitialState(). If the user edits
+  // anything, we must:
+  //   1. Strip the ?d= param from the address bar (so a refresh no longer
+  //      loads the old shared data)
+  //   2. Enable localStorage persistence so their edits are saved
+  //
+  // persistActive starts FALSE when loaded from a URL, TRUE for normal loads.
+  const [persistActive, setPersistActive] = useState(!initial.fromURL);
 
-  // After URL load, start persisting on next change
-  const [_persistActive, setPersistActive] = useState(persistEnabled);
+  usePersistedState({ participants, expenses, tripName, paymentMethods }, persistActive);
+
   useEffect(() => {
-    if (initial.fromURL) {
-      // Once state changes from user interaction, enable persistence
-      setPersistActive(true);
-    }
-  }, [participants, expenses, tripName]);
+    if (!initial.fromURL || persistActive) return; // nothing to do
+    // User made their first edit on a shared-URL session → hand off to localStorage
+    window.history.replaceState({}, '', window.location.pathname);
+    setPersistActive(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [participants, expenses, tripName, paymentMethods]);
 
   // ── Close dropdowns on outside click ──────────────────────────────────────
   useEffect(() => {
@@ -153,8 +173,52 @@ const ExpenseSplitter = () => {
         amount: 0,
         paidBy: participants[0] || '',
         splitAmong: [...participants],
+        paymentMethod: null,         // NEW — no payment method by default
+        includeOwnShare: false,      // NEW — own share toggle default
       },
     ]);
+  };
+
+  // ─── Payment method handlers ────────────────────────────────────────────────
+  const addPaymentMethod = name => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setPaymentMethods(prev =>
+      prev.includes(trimmed) ? prev : [...prev, trimmed]
+    );
+  };
+
+  const createAndAssignPaymentMethod = (expenseId, name) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    // Add to global list if new
+    setPaymentMethods(prev =>
+      prev.includes(trimmed) ? prev : [...prev, trimmed]
+    );
+    // Assign to expense
+    setExpenses(prev =>
+      prev.map(e => e.id === expenseId ? { ...e, paymentMethod: trimmed } : e)
+    );
+  };
+
+  const assignPaymentMethod = (expenseId, name) => {
+    setExpenses(prev =>
+      prev.map(e => e.id === expenseId ? { ...e, paymentMethod: name } : e)
+    );
+  };
+
+  const removePaymentMethod = expenseId => {
+    setExpenses(prev =>
+      prev.map(e => e.id === expenseId ? { ...e, paymentMethod: null } : e)
+    );
+  };
+
+  const toggleOwnShare = expenseId => {
+    setExpenses(prev =>
+      prev.map(e =>
+        e.id === expenseId ? { ...e, includeOwnShare: !(e.includeOwnShare || false) } : e
+      )
+    );
   };
 
   const updateExpense = (id, field, value) => {
@@ -197,17 +261,15 @@ const ExpenseSplitter = () => {
   };
 
   // ─── Share payload ─────────────────────────────────────────────────────────
-  const sharePayload = { p: participants, e: expenses, t: tripName };
+  const sharePayload = { p: participants, e: expenses, t: tripName, pm: paymentMethods };
 
   // ─── Reset ─────────────────────────────────────────────────────────────────
   const handleReset = () => {
-    if (!window.confirm('Reset all data? This cannot be undone.')) return;
+    // Clear persisted state synchronously, then reload for a guaranteed fresh start.
+    // This avoids any in-memory stale state, debounced-save races, or HMR artifacts.
     clearPersistedState();
-    setParticipants(DEFAULT_PARTICIPANTS);
-    setExpenses(DEFAULT_EXPENSES);
-    setTripName(DEFAULT_TRIP_NAME);
-    // Clear URL params
     window.history.replaceState({}, '', window.location.pathname);
+    window.location.reload();
   };
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -222,6 +284,8 @@ const ExpenseSplitter = () => {
           totalSpent={totalSpent}
           onShare={() => setShowShareModal(true)}
           onExport={() => exportToCSV(expenses, `${tripName || 'expense_trip'}.csv`)}
+          showRepay={showRepay}
+          onToggleRepay={() => setShowRepay(prev => !prev)}
         />
 
         {/* Main grid */}
@@ -248,31 +312,39 @@ const ExpenseSplitter = () => {
             />
 
             <BalanceSheet balances={balances} />
+
+            {showRepay && (
+              <RepayPanel
+                expenses={expenses}
+                onToggleOwnShare={toggleOwnShare}
+              />
+            )}
           </div>
 
           {/* RIGHT COLUMN: Expense log */}
           <div className="xl:col-span-2 order-2 xl:order-2 space-y-2">
 
             {/* Mobile cards */}
-            <div className="md:hidden bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                <h2 className="font-semibold text-slate-700 text-sm">
+            <div className="md:hidden bg-white rounded-2xl shadow-sm border border-gray-200/80 overflow-hidden">
+              <div className="px-4 py-3.5 border-b border-gray-100 flex justify-between items-center bg-gray-50/80">
+                <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-widest flex items-center gap-2">
                   Expense Log
-                  <span className="ml-2 text-xs font-normal text-slate-400 bg-white border border-gray-200 px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-normal text-slate-400 bg-white border border-gray-200 px-2 py-0.5 rounded-full">
                     {expenses.length}
                   </span>
                 </h2>
                 <button
                   onClick={addExpenseRow}
-                  className="text-sm bg-white border border-gray-200 text-slate-600 px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-medium"
+                  className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-medium hover:bg-indigo-700 active:scale-95 transition-all shadow-sm"
                 >
                   + Add
                 </button>
               </div>
 
               {expenses.length === 0 ? (
-                <div className="p-10 text-center text-slate-400 text-sm italic">
-                  No expenses yet. Tap <strong>Add</strong> to start.
+                <div className="py-14 text-center text-slate-400 text-sm flex flex-col items-center gap-2">
+                  <span className="text-3xl">🧾</span>
+                  <span>No expenses yet. Tap <strong>Add</strong> to start.</span>
                 </div>
               ) : (
                 expenses.map(expense => (
@@ -280,12 +352,16 @@ const ExpenseSplitter = () => {
                     key={expense.id}
                     expense={expense}
                     participants={participants}
+                    paymentMethods={paymentMethods}
                     activeDropdownId={activeDropdownId}
                     onUpdate={updateExpense}
                     onRemove={removeExpense}
                     onClone={cloneExpense}
                     onToggleSplit={toggleSplitParticipant}
                     onToggleDropdown={toggleDropdown}
+                    onAssignPaymentMethod={assignPaymentMethod}
+                    onCreatePaymentMethod={createAndAssignPaymentMethod}
+                    onRemovePaymentMethod={removePaymentMethod}
                   />
                 ))
               )}
@@ -296,6 +372,7 @@ const ExpenseSplitter = () => {
               <ExpenseTable
                 expenses={expenses}
                 participants={participants}
+                paymentMethods={paymentMethods}
                 activeDropdownId={activeDropdownId}
                 onUpdate={updateExpense}
                 onRemove={removeExpense}
@@ -303,24 +380,49 @@ const ExpenseSplitter = () => {
                 onAddRow={addExpenseRow}
                 onToggleSplit={toggleSplitParticipant}
                 onToggleDropdown={toggleDropdown}
+                onAssignPaymentMethod={assignPaymentMethod}
+                onCreatePaymentMethod={createAndAssignPaymentMethod}
+                onRemovePaymentMethod={removePaymentMethod}
               />
             </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between text-slate-400 text-xs py-4 border-t border-gray-200">
-          <span>Developed by Yash Khandelwal</span>
+        <div className="flex items-center justify-between text-slate-400 text-xs py-4 border-t border-gray-100">
+          <span className="text-slate-300">Developed by Yash Khandelwal</span>
           <div className="flex items-center gap-4">
-            <span className="hidden sm:inline text-slate-300">
-              Ctrl+N — new row · Ctrl+S — share
+            <span className="hidden sm:inline text-slate-300/70">
+              <kbd className="font-sans bg-white border border-gray-200 px-1 rounded text-[9px] text-slate-400">Ctrl+N</kbd> new row
+              {' · '}
+              <kbd className="font-sans bg-white border border-gray-200 px-1 rounded text-[9px] text-slate-400">Ctrl+S</kbd> share
             </span>
-            <button
-              onClick={handleReset}
-              className="text-slate-300 hover:text-red-400 transition-colors text-xs underline underline-offset-2"
-            >
-              Reset
-            </button>
+
+            {/* Inline reset confirmation — avoids window.confirm() which Chrome can block */}
+            {showResetConfirm ? (
+              <span className="flex items-center gap-2">
+                <span className="text-slate-400">Reset everything?</span>
+                <button
+                  onClick={handleReset}
+                  className="text-red-500 hover:text-red-600 font-semibold transition-colors"
+                >
+                  Yes, reset
+                </button>
+                <button
+                  onClick={() => setShowResetConfirm(false)}
+                  className="text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  Cancel
+                </button>
+              </span>
+            ) : (
+              <button
+                onClick={() => setShowResetConfirm(true)}
+                className="text-slate-300 hover:text-red-400 transition-colors text-xs"
+              >
+                Reset
+              </button>
+            )}
           </div>
         </div>
       </div>

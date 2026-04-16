@@ -10,7 +10,7 @@ const BalanceSheet = ({ balances }) => {
   const maxPaid = Math.max(...balances.map(b => b.paid), 1);
 
   return (
-    <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200">
+    <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200/80">
       <h3 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4">
         Detailed Breakdown
       </h3>
@@ -27,7 +27,7 @@ const BalanceSheet = ({ balances }) => {
               <div className="flex justify-between items-baseline">
                 <span className="text-sm font-semibold text-slate-700">{b.name}</span>
                 <span
-                  className={`text-sm font-bold ${
+                  className={`text-sm font-bold tabular-nums ${
                     isPositive ? 'text-emerald-600' : 'text-red-500'
                   }`}
                 >
@@ -41,13 +41,13 @@ const BalanceSheet = ({ balances }) => {
                 {/* Paid bar */}
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-slate-400 w-8 text-right shrink-0">Paid</span>
-                  <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-indigo-400 rounded-full transition-all duration-500"
                       style={{ width: `${paidPct}%` }}
                     />
                   </div>
-                  <span className="text-[10px] text-slate-500 w-16 text-right shrink-0 font-mono">
+                  <span className="text-[10px] text-slate-500 w-16 text-right shrink-0 font-mono tabular-nums">
                     ₹{b.paid.toFixed(0)}
                   </span>
                 </div>
@@ -55,13 +55,13 @@ const BalanceSheet = ({ balances }) => {
                 {/* Share bar */}
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] text-slate-400 w-8 text-right shrink-0">Share</span>
-                  <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-orange-300 rounded-full transition-all duration-500"
                       style={{ width: `${sharePct}%` }}
                     />
                   </div>
-                  <span className="text-[10px] text-slate-500 w-16 text-right shrink-0 font-mono">
+                  <span className="text-[10px] text-slate-500 w-16 text-right shrink-0 font-mono tabular-nums">
                     ₹{b.share.toFixed(0)}
                   </span>
                 </div>
@@ -77,11 +77,11 @@ const BalanceSheet = ({ balances }) => {
       {/* Legend */}
       <div className="flex gap-4 mt-3 pt-2 border-t border-gray-100">
         <div className="flex items-center gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-full bg-indigo-400" />
+          <div className="w-2 h-2 rounded-full bg-indigo-400" />
           <span className="text-[10px] text-slate-400">Paid</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <div className="w-2.5 h-2.5 rounded-full bg-orange-300" />
+          <div className="w-2 h-2 rounded-full bg-orange-300" />
           <span className="text-[10px] text-slate-400">Share</span>
         </div>
         <div className="flex items-center gap-1.5 ml-auto">
