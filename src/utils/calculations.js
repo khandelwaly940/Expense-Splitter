@@ -125,3 +125,59 @@ export function calculateItemizedSettlements(participants, expenses) {
 
   return Array.from(map.values());
 }
+
+/**
+ * Calculate how much each paidBy person owes back to their payment method(s).
+ *
+ * For each expense tagged with a paymentMethod:
+ *   - othersShare = sum of cost-per-person for splitAmong members who ≠ paidBy
+ *   - ownShare    = cost-per-person for paidBy (if they are in splitAmong), else 0
+ *   - repayAmount = othersShare + (expense.includeOwnShare ? ownShare : 0)
+ *
+ * Results are grouped by (paidBy, paymentMethod) and aggregated.
+ *
+ * @param {object[]} expenses
+ * @returns {{ paidBy: string, paymentMethod: string, amount: number, includeOwnShare: boolean, expenseIds: number[] }[]}
+ */
+export function calculateRepayments(expenses) {
+  const map = new Map(); // key: "paidBy::paymentMethod"
+
+  expenses.forEach(expense => {
+    if (!expense.paymentMethod) return; // skip untagged expenses
+
+    const amount = parseFloat(expense.amount) || 0;
+    if (amount === 0) return;
+
+    const payer = expense.paidBy;
+    const method = expense.paymentMethod;
+    const splitAmong = expense.splitAmong || [];
+    const includeOwnShare = expense.includeOwnShare || false;
+
+    // Effective split list: if empty, treat as [payer]
+    const members = splitAmong.length > 0 ? splitAmong : [payer];
+    const costPerPerson = amount / members.length;
+
+    const othersShare = members
+      .filter(p => p !== payer)
+      .reduce(acc => acc + costPerPerson, 0);
+    const ownShare = members.includes(payer) ? costPerPerson : 0;
+    const repayAmount = othersShare + (includeOwnShare ? ownShare : 0);
+
+    const key = `${payer}::${method}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        paidBy: payer,
+        paymentMethod: method,
+        amount: 0,
+        // per-expense includeOwnShare is displayed individually in the panel,
+        // here we just aggregate for the summary total
+        expenseIds: [],
+      });
+    }
+    const entry = map.get(key);
+    entry.amount += repayAmount;
+    entry.expenseIds.push(expense.id);
+  });
+
+  return Array.from(map.values());
+}
