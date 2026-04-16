@@ -2,23 +2,53 @@ import React from 'react';
 import { CreditCard, RefreshCw, ToggleLeft, ToggleRight, RotateCcw } from 'lucide-react';
 
 /**
- * Repay panel — light themed, consistent with the rest of the app.
+ * Repay panel — light themed, fully editable with persist + reset for all amounts.
  *
- * Shows contextual accounting notes per expense:
- *  - includeOwnShare ON  → "Log your expense of ₹[X] into your expense logs"
- *  - includeOwnShare OFF → "Log your expense of ₹[X] into [PaymentMethod]"
+ * Per-expense editable fields (all stored on expense object → persist via localStorage + share URL):
+ *  - repayAmountOverride  → overrides computed repay amount (othersShare ± ownShare)
+ *  - noteAmount           → overrides ₹ amount in the default note sentence
+ *  - noteText             → overrides the full note sentence text
  *
- * The note amount is stored on expense.noteAmount (persisted + shared via URL).
+ * All three follow the same pattern:
+ *   null   = show computed default
+ *   value  = user override (reset button sets back to null)
  *
  * Props:
- *  expenses           — full expense list
- *  onToggleOwnShare   — (expenseId) => void
- *  onUpdateNoteAmount — (expenseId, value) => void
+ *  expenses              — full expense list
+ *  onToggleOwnShare      — (expenseId) => void
+ *  onUpdateNoteAmount    — (expenseId, value | null) => void
+ *  onUpdateRepayAmount   — (expenseId, value | null) => void
+ *  onUpdateNoteText      — (expenseId, value | null) => void
  */
-const RepayPanel = ({ expenses, onToggleOwnShare, onUpdateNoteAmount }) => {
+const RepayPanel = ({
+  expenses,
+  onToggleOwnShare,
+  onUpdateNoteAmount,
+  onUpdateRepayAmount,
+  onUpdateNoteText,
+}) => {
   const tagged = expenses.filter(e => e.paymentMethod && parseFloat(e.amount) > 0);
   if (tagged.length === 0) return null;
 
+  // ── helpers ──────────────────────────────────────────────────────────────────
+
+  /** Compute the base repay amount for one expense (before any override). */
+  const computeLineTotal = (expense) => {
+    const amount = parseFloat(expense.amount) || 0;
+    const members = expense.splitAmong?.length > 0 ? expense.splitAmong : [expense.paidBy];
+    const cpp = amount / members.length;
+    const othersShare = members.filter(p => p !== expense.paidBy).length * cpp;
+    const ownShare = members.includes(expense.paidBy) ? cpp : 0;
+    return { othersShare, ownShare, lineTotal: othersShare + ((expense.includeOwnShare || false) ? ownShare : 0) };
+  };
+
+  /** Effective repay amount: override if set, else computed. */
+  const effectiveRepay = (expense) => {
+    if (expense.repayAmountOverride != null) return parseFloat(expense.repayAmountOverride) || 0;
+    return computeLineTotal(expense).lineTotal;
+  };
+
+  // ── Group by (paidBy, paymentMethod) ─────────────────────────────────────────
   const groups = [];
   const keyIndex = {};
   tagged.forEach(expense => {
@@ -29,6 +59,18 @@ const RepayPanel = ({ expenses, onToggleOwnShare, onUpdateNoteAmount }) => {
     }
     groups[keyIndex[key]].expenses.push(expense);
   });
+
+  // ── Shared style helpers ──────────────────────────────────────────────────────
+  const resetBtn = (color, onClick, title = 'Reset to default') => (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      className={`opacity-40 hover:opacity-100 transition-opacity ${color}`}
+    >
+      <RotateCcw className="w-2.5 h-2.5" />
+    </button>
+  );
 
   return (
     <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200/80 flex flex-col gap-4">
@@ -46,14 +88,10 @@ const RepayPanel = ({ expenses, onToggleOwnShare, onUpdateNoteAmount }) => {
       <div className="space-y-4">
         {groups.map(group => {
 
-          const groupTotal = group.expenses.reduce((sum, e) => {
-            const amt = parseFloat(e.amount) || 0;
-            const members = e.splitAmong?.length > 0 ? e.splitAmong : [e.paidBy];
-            const cpp = amt / members.length;
-            const others = members.filter(p => p !== e.paidBy).length * cpp;
-            const own = members.includes(e.paidBy) ? cpp : 0;
-            return sum + others + ((e.includeOwnShare || false) ? own : 0);
-          }, 0);
+          // Group total uses effective (possibly overridden) repay per expense
+          const groupTotal = group.expenses.reduce(
+            (sum, e) => sum + effectiveRepay(e), 0
+          );
 
           return (
             <div key={`${group.paidBy}::${group.paymentMethod}`} className="space-y-2">
@@ -75,22 +113,29 @@ const RepayPanel = ({ expenses, onToggleOwnShare, onUpdateNoteAmount }) => {
               {/* Per-expense rows */}
               <div className="space-y-2 pl-1">
                 {group.expenses.map(expense => {
-                  const amount = parseFloat(expense.amount) || 0;
-                  const members = expense.splitAmong?.length > 0
-                    ? expense.splitAmong : [expense.paidBy];
-                  const costPerPerson = amount / members.length;
-                  const othersCount = members.filter(p => p !== expense.paidBy).length;
-                  const othersShare = othersCount * costPerPerson;
-                  const ownShare = members.includes(expense.paidBy) ? costPerPerson : 0;
+                  const { ownShare, lineTotal: computedLineTotal } = computeLineTotal(expense);
                   const includeOwn = expense.includeOwnShare || false;
-                  const lineTotal = othersShare + (includeOwn ? ownShare : 0);
 
-                  // noteAmount: use expense.noteAmount if set, otherwise default to ceiled ownShare
+                  // ── Repay amount (editable) ────────────────────────────────
+                  const repayOverridden = expense.repayAmountOverride != null;
+                  const repayDisplay = repayOverridden
+                    ? expense.repayAmountOverride
+                    : String(Math.ceil(computedLineTotal));
+
+                  // ── Note defaults ──────────────────────────────────────────
                   const defaultNoteAmt = Math.ceil(ownShare);
                   const noteAmtDisplay = expense.noteAmount != null
                     ? expense.noteAmount
                     : (defaultNoteAmt > 0 ? String(defaultNoteAmt) : '');
+                  const noteAmtOverridden = expense.noteAmount != null;
 
+                  // Default note sentence (with noteAmount or computed own share)
+                  const noteAmtForDefault = expense.noteAmount != null
+                    ? expense.noteAmount : defaultNoteAmt;
+                  const computedNoteText = includeOwn
+                    ? `Log your expense of ₹${noteAmtForDefault} into your expense logs`
+                    : `Log your expense of ₹${noteAmtForDefault} into ${expense.paymentMethod}`;
+                  const noteTextOverridden = expense.noteText != null;
                   const showNote = ownShare > 0;
 
                   return (
@@ -98,17 +143,32 @@ const RepayPanel = ({ expenses, onToggleOwnShare, onUpdateNoteAmount }) => {
                       key={expense.id}
                       className="bg-gray-50 rounded-xl px-3 py-2.5 border border-gray-200 space-y-2"
                     >
-                      {/* Name + repay total */}
+                      {/* ── Name + editable repay amount ── */}
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs text-slate-600 truncate font-medium">
                           {expense.item || 'Untitled'}
                         </span>
-                        <span className="font-mono text-sm font-semibold text-slate-800 shrink-0 tabular-nums">
-                          ₹{Math.ceil(lineTotal).toLocaleString('en-IN')}
-                        </span>
+
+                        {/* Editable repay amount */}
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <span className="text-xs text-slate-400">₹</span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={repayDisplay}
+                            placeholder={String(Math.ceil(computedLineTotal))}
+                            onChange={e => onUpdateRepayAmount(expense.id, e.target.value)}
+                            className="w-20 font-mono text-sm font-semibold text-slate-800 bg-transparent outline-none text-right border-b border-transparent hover:border-gray-300 focus:border-indigo-400 transition-colors tabular-nums"
+                          />
+                          {repayOverridden && resetBtn(
+                            'text-slate-500',
+                            () => onUpdateRepayAmount(expense.id, null),
+                            'Reset to computed repay amount'
+                          )}
+                        </div>
                       </div>
 
-                      {/* Own-share toggle */}
+                      {/* ── Own-share toggle ── */}
                       <div className="flex items-center gap-1.5">
                         <button
                           type="button"
@@ -133,51 +193,83 @@ const RepayPanel = ({ expenses, onToggleOwnShare, onUpdateNoteAmount }) => {
                         )}
                       </div>
 
-                      {/* Accounting note */}
+                      {/* ── Accounting note ── */}
                       {showNote && (
-                        <div className={`rounded-lg px-2.5 py-2 border text-[11px] leading-snug ${
+                        <div className={`rounded-lg px-2.5 py-2 border text-[11px] leading-snug space-y-1.5 ${
                           includeOwn
-                            ? 'bg-emerald-50 border-emerald-200/80 text-emerald-700'
-                            : 'bg-amber-50 border-amber-200/80 text-amber-700'
+                            ? 'bg-emerald-50 border-emerald-200/80'
+                            : 'bg-amber-50 border-amber-200/80'
                         }`}>
-                          <span className="flex flex-wrap items-baseline gap-x-1 gap-y-0.5">
-                            <span>📒 Log your expense of</span>
-                            <span className="inline-flex items-center gap-0.5">
-                              <span className={`text-[10px] ${includeOwn ? 'text-emerald-500' : 'text-amber-500'}`}>₹</span>
+
+                          {/* Note text row: either free-form override or structured default */}
+                          {noteTextOverridden ? (
+                            /* Free-form editable note text */
+                            <div className="flex items-center gap-1">
+                              <span>📒</span>
                               <input
-                                type="number"
-                                min="0"
-                                value={noteAmtDisplay}
-                                placeholder={String(defaultNoteAmt)}
-                                onChange={e => onUpdateNoteAmount(expense.id, e.target.value)}
-                                className={`w-16 bg-transparent outline-none text-[11px] font-mono text-right px-0.5 border-b ${
+                                type="text"
+                                value={expense.noteText}
+                                onChange={e => onUpdateNoteText(expense.id, e.target.value)}
+                                placeholder={computedNoteText}
+                                className={`flex-1 bg-transparent outline-none text-[11px] border-b transition-colors ${
                                   includeOwn
-                                    ? 'border-emerald-300 text-emerald-800'
-                                    : 'border-amber-300 text-amber-800'
+                                    ? 'border-emerald-300 text-emerald-800 placeholder-emerald-400/50 focus:border-emerald-500'
+                                    : 'border-amber-300 text-amber-800 placeholder-amber-400/50 focus:border-amber-500'
                                 }`}
                               />
-                              {expense.noteAmount != null && (
-                                <button
-                                  type="button"
-                                  title="Reset to default (own share)"
-                                  onClick={() => onUpdateNoteAmount(expense.id, null)}
-                                  className={`ml-0.5 opacity-50 hover:opacity-100 transition-opacity ${
-                                    includeOwn ? 'text-emerald-600' : 'text-amber-600'
-                                  }`}
-                                >
-                                  <RotateCcw className="w-2.5 h-2.5" />
-                                </button>
+                              {resetBtn(
+                                includeOwn ? 'text-emerald-600' : 'text-amber-600',
+                                () => onUpdateNoteText(expense.id, null),
+                                'Reset note text to default'
                               )}
+                            </div>
+                          ) : (
+                            /* Structured default: text with editable ₹ amount inline */
+                            <span className={`flex flex-wrap items-center gap-x-1 gap-y-0.5 ${
+                              includeOwn ? 'text-emerald-700' : 'text-amber-700'
+                            }`}>
+                              <span>📒 Log your expense of</span>
+                              <span className="inline-flex items-center gap-0.5">
+                                <span className={`text-[10px] ${includeOwn ? 'text-emerald-500' : 'text-amber-500'}`}>₹</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={noteAmtDisplay}
+                                  placeholder={String(defaultNoteAmt)}
+                                  onChange={e => onUpdateNoteAmount(expense.id, e.target.value)}
+                                  className={`w-16 bg-transparent outline-none text-[11px] font-mono text-right px-0.5 border-b ${
+                                    includeOwn
+                                      ? 'border-emerald-300 text-emerald-800'
+                                      : 'border-amber-300 text-amber-800'
+                                  }`}
+                                />
+                                {noteAmtOverridden && resetBtn(
+                                  includeOwn ? 'text-emerald-600' : 'text-amber-600',
+                                  () => onUpdateNoteAmount(expense.id, null),
+                                  'Reset to own share amount'
+                                )}
+                              </span>
+                              {includeOwn ? (
+                                <span>into your expense logs</span>
+                              ) : (
+                                <>
+                                  <span>into</span>
+                                  <span className="font-semibold">{expense.paymentMethod}</span>
+                                </>
+                              )}
+                              {/* Edit entire note text button */}
+                              <button
+                                type="button"
+                                title="Edit full note text"
+                                onClick={() => onUpdateNoteText(expense.id, computedNoteText)}
+                                className={`text-[9px] font-medium ml-1 opacity-40 hover:opacity-100 transition-opacity underline underline-offset-1 ${
+                                  includeOwn ? 'text-emerald-600' : 'text-amber-600'
+                                }`}
+                              >
+                                edit text
+                              </button>
                             </span>
-                            {includeOwn ? (
-                              <span>into your expense logs</span>
-                            ) : (
-                              <>
-                                <span>into</span>
-                                <span className="font-semibold">{expense.paymentMethod}</span>
-                              </>
-                            )}
-                          </span>
+                          )}
                         </div>
                       )}
 
