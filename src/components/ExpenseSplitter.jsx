@@ -78,7 +78,7 @@ const ExpenseSplitter = () => {
   const [settlementMethod, setSettlementMethod] = useState('smart');
   const [expandedGroup, setExpandedGroup] = useState(null);
   const [showShareModal, setShowShareModal] = useState(false);
-  const [showRepay, setShowRepay] = useState(true);
+  const [showRepay, setShowRepay] = useState(!initial.fromURL ? true : false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // ── URL-share → localStorage handoff ─────────────────────────────────────
@@ -335,13 +335,15 @@ const ExpenseSplitter = () => {
             <BalanceSheet balances={balances} />
 
             {showRepay && (
-              <RepayPanel
-                expenses={expenses}
-                onToggleOwnShare={toggleOwnShare}
-                onUpdateNoteAmount={updateNoteAmount}
-                onUpdateRepayAmount={updateRepayAmount}
-                onUpdateNoteText={updateNoteText}
-              />
+              <div className="hidden xl:block">
+                <RepayPanel
+                  expenses={expenses}
+                  onToggleOwnShare={toggleOwnShare}
+                  onUpdateNoteAmount={updateNoteAmount}
+                  onUpdateRepayAmount={updateRepayAmount}
+                  onUpdateNoteText={updateNoteText}
+                />
+              </div>
             )}
           </div>
 
@@ -411,6 +413,19 @@ const ExpenseSplitter = () => {
             </div>
           </div>
         </div>
+
+        {/* Mobile-only Repay panel — rendered after the expense log so it appears last on mobile */}
+        {showRepay && (
+          <div className="xl:hidden">
+            <RepayPanel
+              expenses={expenses}
+              onToggleOwnShare={toggleOwnShare}
+              onUpdateNoteAmount={updateNoteAmount}
+              onUpdateRepayAmount={updateRepayAmount}
+              onUpdateNoteText={updateNoteText}
+            />
+          </div>
+        )}
 
         {/* Footer */}
         <div className="flex items-center justify-between text-slate-400 text-xs py-4 border-t border-gray-100">
