@@ -37,11 +37,11 @@ export default {
       .filter(Boolean);
 
     const origin = request.headers.get('Origin') || '';
-    const isAllowed = allowedOrigins.length === 0 || allowedOrigins.includes(origin);
+    const isAllowed = allowedOrigins.includes(origin);
 
     // ── CORS preflight ──────────────────────────────────────────────────
     if (request.method === 'OPTIONS') {
-      return corsResponse(null, 204, isAllowed ? origin : '');
+      return corsResponse(isAllowed ? null : JSON.stringify({ error: 'Forbidden origin' }), isAllowed ? 204 : 403, isAllowed ? origin : null);
     }
 
     // ── Diagnostic GET (no secrets exposed) ─────────────────────────────
@@ -55,17 +55,17 @@ export default {
         },
         origin,
         is_allowed: isAllowed,
-      }), 200, isAllowed ? origin : '*');
+      }), 200, isAllowed ? origin : null);
     }
 
     // ── Only allow POST ─────────────────────────────────────────────────
     if (request.method !== 'POST') {
-      return corsResponse(JSON.stringify({ error: 'Method not allowed' }), 405, isAllowed ? origin : '');
+      return corsResponse(JSON.stringify({ error: 'Method not allowed' }), 405, isAllowed ? origin : null);
     }
 
     // ── Origin check ────────────────────────────────────────────────────
     if (!isAllowed) {
-      return corsResponse(JSON.stringify({ error: 'Forbidden origin' }), 403, '');
+      return corsResponse(JSON.stringify({ error: 'Forbidden origin' }), 403, null);
     }
 
     // ── Rate limiting (10 short links / IP / hour) ───────────────────────
@@ -106,7 +106,10 @@ export default {
       return corsResponse(JSON.stringify({ error: 'Invalid JSON body' }), 400, origin);
     }
 
-    const { destination_url, expires_in_hours, title } = body;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return corsResponse(JSON.stringify({ error: 'Invalid JSON body' }), 400, origin);
+    }
+    const { destination_url, title } = body;
 
     if (!destination_url || typeof destination_url !== 'string') {
       return corsResponse(JSON.stringify({ error: 'destination_url is required' }), 400, origin);
@@ -123,15 +126,26 @@ export default {
 
     // Fallback hardcoded list — used when env var is not set (e.g. local dev without .dev.vars)
     const DEFAULT_DESTINATIONS = [
-      'https://yashkhandelwal.me',
-      'https://khandelwaly940.github.io',
+      'https://yashkhandelwal.me/Expense-Splitter/',
+      'https://khandelwaly940.github.io/Expense-Splitter/',
       'http://localhost:5173',
       'http://localhost:5174',
     ];
 
     const destinationAllowlist = ALLOWED_DESTINATIONS.length > 0 ? ALLOWED_DESTINATIONS : DEFAULT_DESTINATIONS;
 
-    const isDestinationAllowed = destinationAllowlist.some(d => destination_url.startsWith(d));
+    let destination;
+    try { destination = new URL(destination_url); } catch {
+      return corsResponse(JSON.stringify({ error: 'Invalid destination URL' }), 400, origin);
+    }
+    const isDestinationAllowed = destinationAllowlist.some(d => {
+      try {
+        const allowed = new URL(d);
+        if (destination.origin !== allowed.origin) return false;
+        const basePath = allowed.pathname.endsWith('/') ? allowed.pathname : `${allowed.pathname}/`;
+        return allowed.pathname === '/' || destination.pathname === allowed.pathname || destination.pathname.startsWith(basePath);
+      } catch { return false; }
+    });
     if (!isDestinationAllowed) {
       return corsResponse(
         JSON.stringify({ error: 'Forbidden destination: short links may only point to allowed domains.' }),
@@ -143,9 +157,6 @@ export default {
     // ── Build request payload ────────────────────────────────────────────
     const payload = { domain_id: env.OPENSHORT_DOMAIN_ID, destination_url };
     if (title) payload.title = String(title).slice(0, 255);
-    if (expires_in_hours) {
-      payload.expires_at = Math.floor(Date.now() / 1000) + Number(expires_in_hours) * 3600;
-    }
 
     // ── POST to OpenShortURL Worker via Service Binding (no public internet hop) ──
     let apiRes, apiJson;
@@ -178,7 +189,7 @@ export default {
       );
     }
 
-    if (!apiJson.success) {
+    if (!apiRes.ok || !apiJson.success) {
       const msg = apiJson.error?.message || 'Failed to create short link';
       const detail = msg.toLowerCase().includes('csrf')
         ? 'OpenShortURL CSRF not bypassed for API key auth.'
@@ -198,7 +209,7 @@ export default {
     try {
       const meta = typeof link.metadata === 'string' ? JSON.parse(link.metadata) : link.metadata;
       if (meta?.route) route = meta.route.replace('/*', '');
-    } catch {}
+    } catch { /* Metadata route is optional. */ }
 
     const shortUrl = `https://${domainName}${route}/${link.slug}`;
 
@@ -212,14 +223,15 @@ export default {
 
 // ── Helper ──────────────────────────────────────────────────────────────────
 function corsResponse(body, status, allowedOrigin) {
+  const headers = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Max-Age': '86400',
+  };
+  if (allowedOrigin) headers['Access-Control-Allow-Origin'] = allowedOrigin;
   return new Response(body, {
     status,
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': allowedOrigin || '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-      'Access-Control-Max-Age': '86400',
-    },
+    headers,
   });
 }

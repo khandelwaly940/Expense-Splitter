@@ -9,11 +9,11 @@
  */
 import LZString from 'lz-string';
 
-// Proxy URL is hardcoded for convenience.
-// Override with VITE_SHORTLINK_PROXY_URL env var if you self-host a different proxy.
+// Local development must opt in to a proxy to avoid writing test links to live D1.
+// Production uses the configured URL or the existing deployed proxy.
 const PROXY_URL =
-  import.meta.env.VITE_SHORTLINK_PROXY_URL ||
-  'https://expense-shortlink-proxy.khandelwaly940.workers.dev';
+  import.meta.env?.VITE_SHORTLINK_PROXY_URL ||
+  (import.meta.env?.DEV ? '' : 'https://expense-shortlink-proxy.khandelwaly940.workers.dev');
 
 // ---------------------------------------------------------------------------
 // Encoding / Decoding
@@ -42,7 +42,16 @@ export function decodeLegacy(str) {
  * @returns {{ p: string[], e: object[], t?: string } | null}
  */
 export function loadFromURL() {
-  const params = new URLSearchParams(window.location.search);
+  return parseShareURL(window.location.href);
+}
+
+/** Parse a full share URL; never follow a pasted URL or fetch its contents. */
+export function parseShareURL(input) {
+  let url;
+  try { url = new URL(input); } catch { return null; }
+  const validOrigin = url.origin === window.location.origin || ['https://yashkhandelwal.me', 'https://khandelwaly940.github.io'].includes(url.origin);
+  if (!validOrigin || !['/Expense-Splitter', '/Expense-Splitter/'].includes(url.pathname)) return null;
+  const params = url.searchParams;
 
   const compressed = params.get('d');
   if (compressed) {
@@ -74,20 +83,18 @@ export function buildFullShareURL(payload) {
  * The API key never leaves the Worker — this call is safe in the browser.
  *
  * @param {string} destinationUrl  - The full URL to shorten (the `?d=` URL)
- * @param {{ expiresInHours?: number|null, title?: string }} options
+ * @param {{ title?: string }} options
  * @returns {Promise<{ shortUrl: string, slug: string }>}
  */
-export async function createShortLink(destinationUrl, { expiresInHours, title } = {}) {
+export async function createShortLink(destinationUrl, { title } = {}) {
   if (!PROXY_URL) {
     throw new Error(
-      'Short-link proxy not configured. Add VITE_SHORTLINK_PROXY_URL to your .env file.\n' +
-      'See shortlink-proxy/worker.js for setup instructions.'
+      'Short links are disabled in this local preview to avoid writing to the live service. You can still copy the full snapshot link.'
     );
   }
 
   const body = { destination_url: destinationUrl };
   if (title) body.title = title;
-  if (expiresInHours) body.expires_in_hours = expiresInHours;
 
   const res = await fetch(PROXY_URL, {
     method: 'POST',
@@ -97,7 +104,7 @@ export async function createShortLink(destinationUrl, { expiresInHours, title } 
 
   const json = await res.json();
 
-  if (!json.success) {
+  if (!res.ok || !json.success || typeof json.short_url !== 'string' || !json.short_url.startsWith('https://')) {
     throw new Error(json.error || `Proxy error (${res.status})`);
   }
 
@@ -128,8 +135,7 @@ export async function copyToClipboard(text) {
   el.focus();
   el.select();
   try {
-    document.execCommand('copy');
-    return true;
+    return document.execCommand('copy');
   } catch {
     return false;
   } finally {

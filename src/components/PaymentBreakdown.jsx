@@ -1,0 +1,17 @@
+import Dialog from './Dialog';
+import InfoTip from './InfoTip';
+import SelectionPopover from './SelectionPopover';
+import MethodPicker from './MethodPicker';
+import { Plus, Trash2 } from 'lucide-react';
+import { paymentsFor, toPaise, expenseIssues } from '../utils/expenses';
+import { newId } from '../utils/trips';
+import { money } from './BillWorkspace';
+import { personColor, personStyle } from '../utils/personColors';
+
+export default function PaymentBreakdown({ expense, participants, people, methods, onChange, onClose, readOnly }) {
+  const payments = paymentsFor(expense);
+  const change = (index, field, value) => onChange(payments.map((p, i) => i === index ? { ...p, [field]: value } : p));
+  const difference = (toPaise(expense.amount) || 0) - payments.reduce((sum, p) => sum + (toPaise(p.amount) || 0), 0);
+  const issues = expenseIssues(expense, participants);
+  return <Dialog title="Payment breakdown" onClose={onClose}><div className="dialog-body payment-breakdown"><div className="payment-breakdown-total"><span>{expense.item || 'New expense'}<InfoTip label="About payment contributions">Payment amounts must equal the expense total. Split with determines everyone’s share separately. With no split selected, each payer bears their own contribution.</InfoTip></span><strong>{money(expense.amount)}</strong></div><div className="contribution-list">{payments.map((p, index) => <div className="contribution" key={p.id || index}><div className="contribution-fields"><div className="field">Paid by{readOnly ? <strong className="person-label" style={personStyle(personColor(people, p.paidBy))}>{p.paidBy}</strong> : <SelectionPopover label={`Payer for contribution ${index + 1}`} title="Paid by" summary={<span className="person-label" style={personStyle(personColor(people, p.paidBy))}>{p.paidBy || 'Choose payer'}</span>} options={participants.map(name => ({ value: name, label: name, color: personColor(people, name) }))} selected={[p.paidBy]} onSelect={value => change(index, 'paidBy', value)} />}</div><div className="field">Method{readOnly ? <strong>{p.paymentMethod || '—'}</strong> : <MethodPicker label={`Method for contribution ${index + 1}`} value={p.paymentMethod} methods={methods} onChange={value => change(index, 'paymentMethod', value)} />}</div><label className="field">Paid (₹){readOnly ? <strong>{money(p.amount)}</strong> : <input aria-label={`Amount for contribution ${index + 1}`} type="number" inputMode="decimal" min="0.01" step="0.01" value={p.amount} onChange={e => change(index, 'amount', e.target.value)} />}</label></div>{!readOnly && payments.length > 1 && <button type="button" className="icon-button danger" aria-label={`Remove contribution ${index + 1}`} onClick={() => onChange(payments.filter((_, i) => i !== index))}><Trash2 size={16} /></button>}</div>)}</div>{!readOnly && <button className="text-button" onClick={() => onChange([...payments, { id: newId(), paidBy: participants[0], paymentMethod: null, amount: '' }])}><Plus size={15} />Add contribution</button>}<div className={`contribution-status ${issues.payments || issues.paidBy ? 'warning-banner' : 'positive'}`} role="status">{difference > 0 ? `${money(difference / 100)} remaining` : difference < 0 ? `${money(-difference / 100)} over total` : issues.payments || issues.paidBy || 'Payments match total'}</div></div><footer className="dialog-footer"><button className="button primary" onClick={onClose}>Done</button></footer></Dialog>;
+}
