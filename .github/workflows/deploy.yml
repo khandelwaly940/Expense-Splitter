@@ -19,13 +19,16 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           # package-lock.json is at the repo root (this repo IS the Expense app)
           cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Lint and test
+        run: npm run lint && npm test
 
       - name: Build
         env:

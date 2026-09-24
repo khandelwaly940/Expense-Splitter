@@ -42,8 +42,10 @@ https://yashkhandelwal.me,https://khandelwaly940.github.io,http://localhost:5173
 | `OPENSHORT_API_KEY` | ✅ | — | Bearer token for OpenShortURL API |
 | `OPENSHORT_DOMAIN_ID` | ✅ | — | Domain ID to create links under |
 | `ALLOWED_ORIGINS` | ✅ | — | Comma-separated allowed request origins |
-| `ALLOWED_DESTINATIONS` | ❌ | hardcoded in worker.js | Comma-separated destination domain prefixes; short links may only point to these |
+| `ALLOWED_DESTINATIONS` | ❌ | hardcoded in worker.js | Comma-separated allowed URL roots, e.g. `https://yashkhandelwal.me/Expense-Splitter/`; origins and paths are parsed, not string-prefix matched |
 | `RATE_LIMIT_PER_HOUR` | ❌ | `10` | Max short links per IP per hour |
+
+Short and direct links do not include an expiry setting. If an older client sends `expires_in_hours`, the proxy ignores it and creates the same non-expiring short link as the current app.
 
 ## Local development
 
@@ -82,5 +84,5 @@ curl https://expense-shortlink-proxy.khandelwaly940.workers.dev
 curl -s -X POST https://expense-shortlink-proxy.khandelwaly940.workers.dev \
   -H "Content-Type: application/json" \
   -H "Origin: http://localhost:5174" \
-  -d '{"destination_url":"https://example.com","title":"Test"}'
+  -d '{"destination_url":"https://yashkhandelwal.me/Expense-Splitter/?d=YOUR_ENCODED_BILL","title":"Test"}'
 ```
